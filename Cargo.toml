@@ -9,6 +9,7 @@ num-derive = "0.4"
 num-traits = "0.2"
 rayon = "1.11"
 walkdir = "2"
+clap = { version = "4.5.58", features = ["derive"] }
 
 [dev-dependencies]
 expect-test = "1"
