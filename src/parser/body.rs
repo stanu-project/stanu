@@ -2,6 +2,24 @@ use crate::syntax_kind::SyntaxKind;
 
 use super::Parser;
 
+/// In HCL, keywords can appear as identifiers in body context (block type names,
+/// attribute names). For example: `null = { ... }` or `true = "yes"`.
+fn is_ident_like(kind: SyntaxKind) -> bool {
+    matches!(
+        kind,
+        SyntaxKind::IDENT
+            | SyntaxKind::TRUE_KW
+            | SyntaxKind::FALSE_KW
+            | SyntaxKind::NULL_KW
+            | SyntaxKind::FOR_KW
+            | SyntaxKind::IN_KW
+            | SyntaxKind::IF_KW
+            | SyntaxKind::ELSE_KW
+            | SyntaxKind::ENDIF_KW
+            | SyntaxKind::ENDFOR_KW
+    )
+}
+
 pub(crate) fn parse_source_file(p: &mut Parser) {
     p.start_node(SyntaxKind::SOURCE_FILE);
     parse_body(p);
@@ -18,15 +36,15 @@ pub(crate) fn parse_body(p: &mut Parser) {
 
         match p.peek() {
             Some(SyntaxKind::BRACE_R) => break, // end of block body
-            Some(SyntaxKind::IDENT) => {
+            Some(kind) if is_ident_like(kind) => {
                 // Lookahead to determine attribute vs block:
                 // attribute: IDENT = expr
                 // block:     IDENT [labels...] {
                 match p.peek_non_trivia_nth(1) {
                     Some(SyntaxKind::EQ) => parse_attribute(p),
+                    Some(kind) if is_ident_like(kind) => parse_block(p),
                     Some(
                         SyntaxKind::BRACE_L
-                        | SyntaxKind::IDENT
                         | SyntaxKind::QUOTE
                         | SyntaxKind::STRING_LIT,
                     ) => parse_block(p),
@@ -46,7 +64,7 @@ pub(crate) fn parse_body(p: &mut Parser) {
 
 fn parse_attribute(p: &mut Parser) {
     p.start_node(SyntaxKind::ATTRIBUTE);
-    p.bump(); // IDENT
+    p.bump(); // IDENT (or keyword used as ident)
     p.skip_trivia();
     p.expect(SyntaxKind::EQ);
     p.skip_trivia();
@@ -58,13 +76,15 @@ fn parse_attribute(p: &mut Parser) {
 
 fn parse_block(p: &mut Parser) {
     p.start_node(SyntaxKind::BLOCK);
-    p.bump(); // IDENT (block type)
+    p.bump(); // IDENT or keyword (block type)
     p.skip_trivia();
 
-    // Parse labels (identifiers or quoted strings)
+    // Parse labels (identifiers, keywords-as-idents, or quoted strings)
     loop {
         match p.peek() {
-            Some(SyntaxKind::IDENT) => {
+            Some(kind) if is_ident_like(kind) => {
+                // But not if this ident is followed by `=` or `{` (that starts nested structure)
+                // A label ident is followed by another label, a string, or `{`
                 p.start_node(SyntaxKind::BLOCK_LABEL);
                 p.bump();
                 p.finish_node();

@@ -412,10 +412,20 @@ impl<'a> Lexer<'a> {
                 self.mode_stack.pop(); // back to previous mode
                 self.make_token(SyntaxKind::QUOTE, start)
             }
+            '$' if self.peek_char_at(1) == Some('$') => {
+                // $$ is an escape for a literal $
+                self.advance_n(2);
+                self.make_token(SyntaxKind::ESCAPE_SEQUENCE, start)
+            }
             '$' if self.peek_char_at(1) == Some('{') => {
                 self.advance_n(2);
                 self.mode_stack.push(ModeEntry::new(Mode::Interpolation));
                 self.make_token(SyntaxKind::DOLLAR_OPEN, start)
+            }
+            '%' if self.peek_char_at(1) == Some('%') => {
+                // %% is an escape for a literal %
+                self.advance_n(2);
+                self.make_token(SyntaxKind::ESCAPE_SEQUENCE, start)
             }
             '%' if self.peek_char_at(1) == Some('{') => {
                 self.advance_n(2);
@@ -470,7 +480,9 @@ impl<'a> Lexer<'a> {
             match self.peek_char() {
                 Some('"') | Some('\\') => break,
                 Some('$') if self.peek_char_at(1) == Some('{') => break,
+                Some('$') if self.peek_char_at(1) == Some('$') => break,
                 Some('%') if self.peek_char_at(1) == Some('{') => break,
+                Some('%') if self.peek_char_at(1) == Some('%') => break,
                 Some(_) => { self.advance(); }
                 None => break,
             }
@@ -504,10 +516,20 @@ impl<'a> Lexer<'a> {
         let c = self.peek_char().unwrap();
 
         match c {
+            '$' if self.peek_char_at(1) == Some('$') => {
+                // $$ is an escape for a literal $ in heredoc
+                self.advance_n(2);
+                self.make_token(SyntaxKind::ESCAPE_SEQUENCE, start)
+            }
             '$' if self.peek_char_at(1) == Some('{') => {
                 self.advance_n(2);
                 self.mode_stack.push(ModeEntry::new(Mode::Interpolation));
                 self.make_token(SyntaxKind::DOLLAR_OPEN, start)
+            }
+            '%' if self.peek_char_at(1) == Some('%') => {
+                // %% is an escape for a literal % in heredoc
+                self.advance_n(2);
+                self.make_token(SyntaxKind::ESCAPE_SEQUENCE, start)
             }
             '%' if self.peek_char_at(1) == Some('{') => {
                 self.advance_n(2);
@@ -550,11 +572,13 @@ impl<'a> Lexer<'a> {
     }
 
     fn lex_heredoc_content(&mut self, start: usize) -> Token {
-        // Consume content until we hit a template marker or end of line
+        // Consume content until we hit a template marker, escape, or end of line
         while self.pos < self.source.len() {
             match self.peek_char() {
                 Some('$') if self.peek_char_at(1) == Some('{') => break,
+                Some('$') if self.peek_char_at(1) == Some('$') => break,
                 Some('%') if self.peek_char_at(1) == Some('{') => break,
+                Some('%') if self.peek_char_at(1) == Some('%') => break,
                 Some('\n') => {
                     self.advance(); // consume the newline
                     // Check if next line is closing anchor

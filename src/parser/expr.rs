@@ -135,10 +135,14 @@ fn parse_postfix_expr(p: &mut Parser) {
 }
 
 fn parse_splat_body(p: &mut Parser) {
-    let has_body = matches!(
-        p.peek_non_trivia(),
-        Some(SyntaxKind::DOT | SyntaxKind::BRACKET_L)
-    );
+    let has_body = match p.peek_non_trivia() {
+        Some(SyntaxKind::DOT) => true,
+        Some(SyntaxKind::BRACKET_L) => {
+            // [*] starts a new splat, not part of this splat body
+            p.peek_non_trivia_nth(1) != Some(SyntaxKind::STAR)
+        }
+        _ => false,
+    };
     if !has_body {
         return;
     }
@@ -148,6 +152,10 @@ fn parse_splat_body(p: &mut Parser) {
         p.skip_trivia();
         match p.peek() {
             Some(SyntaxKind::DOT) => {
+                // .* starts a new splat - stop here
+                if p.peek_non_trivia_nth(1) == Some(SyntaxKind::STAR) {
+                    break;
+                }
                 p.start_node(SyntaxKind::ATTR_ACCESS_EXPR);
                 p.bump(); // .
                 p.skip_trivia();
@@ -155,6 +163,10 @@ fn parse_splat_body(p: &mut Parser) {
                 p.finish_node();
             }
             Some(SyntaxKind::BRACKET_L) => {
+                // [*] starts a new splat - stop here
+                if p.peek_non_trivia_nth(1) == Some(SyntaxKind::STAR) {
+                    break;
+                }
                 p.start_node(SyntaxKind::INDEX_EXPR);
                 p.bump(); // [
                 p.skip_trivia();
