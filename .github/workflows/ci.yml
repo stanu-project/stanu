@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: NixOS/nix-installer-action@v1
+      - name: Restore Nix Store Cache
+        uses: actions/cache@v4
+        with:
+          path: /nix/store
+          key: ${{ runner.os }}-nix-${{ hashFiles('Cargo.lock', 'flake.nix') }}
+          restore-keys: |
+            ${{ runner.os }}-nix-
+      - run: nix flake check
+
+  build-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-linux
+          - os: macos-13
+            target: x86_64-darwin
+          - os: macos-14
+            target: aarch64-darwin
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: NixOS/nix-installer-action@v1
+      - name: Restore Nix Store Cache
+        uses: actions/cache@v4
+        with:
+          path: /nix/store
+          key: ${{ matrix.target }}-nix-${{ hashFiles('Cargo.lock', 'flake.nix') }}
+          restore-keys: |
+            ${{ matrix.target }}-nix-
+      - run: nix build .#default
+      - name: Prepare binary
+        run: |
+          mkdir -p dist
+          cp result/bin/stanu dist/stanu-${{ matrix.target }}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stanu-${{ matrix.target }}
+          path: dist/stanu-${{ matrix.target }}
+
+  release:
+    needs: build-release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Create Release
+        run: |
+          gh release create ${{ github.ref_name }} 
+            --title "Release ${{ github.ref_name }}" 
+            --generate-notes 
+            artifacts/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
