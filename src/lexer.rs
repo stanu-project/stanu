@@ -20,7 +20,6 @@ struct ModeEntry {
     mode: Mode,
     brace_depth: usize,
     heredoc_anchor: String,
-    heredoc_indent: bool,
 }
 
 impl ModeEntry {
@@ -29,16 +28,14 @@ impl ModeEntry {
             mode,
             brace_depth: 0,
             heredoc_anchor: String::new(),
-            heredoc_indent: false,
         }
     }
 
-    fn heredoc(anchor: String, indent: bool) -> Self {
+    fn heredoc(anchor: String) -> Self {
         Self {
             mode: Mode::HeredocTemplate,
             brace_depth: 0,
             heredoc_anchor: anchor,
-            heredoc_indent: indent,
         }
     }
 }
@@ -264,17 +261,14 @@ impl<'a> Lexer<'a> {
 
     fn lex_heredoc_open(&mut self, start: usize) -> Token {
         self.advance_n(2); // consume <<
-        let indent = if self.peek_char() == Some('-') {
-            self.advance();
-            true
-        } else {
-            false
-        };
+
         // Read anchor identifier
         let anchor_start = self.pos;
         while self.pos < self.source.len() {
             match self.peek_char() {
-                Some(c) if c.is_ascii_alphanumeric() || c == '_' => { self.advance(); }
+                Some(c) if c.is_ascii_alphanumeric() || c == '_' => {
+                    self.advance();
+                }
                 _ => break,
             }
         }
@@ -286,7 +280,7 @@ impl<'a> Lexer<'a> {
         if self.peek_char() == Some('\n') {
             self.advance();
         }
-        self.mode_stack.push(ModeEntry::heredoc(anchor, indent));
+        self.mode_stack.push(ModeEntry::heredoc(anchor));
         self.make_token(SyntaxKind::HEREDOC_OPEN, start)
     }
 
