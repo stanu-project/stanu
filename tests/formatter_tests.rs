@@ -145,7 +145,6 @@ fn blank_line_before_block_in_body() {
         "a = 1\nresource {\n  b = 2\n}\n",
         expect![[r#"
             a = 1
-
             resource {
               b = 2
             }
@@ -220,7 +219,7 @@ fn object_inline() {
     check_fmt(
         "x = {a = 1, b = 2}\n",
         expect![[r#"
-            x = {a = 1, b = 2}
+            x = { a = 1, b = 2 }
         "#]],
     );
 }
@@ -270,7 +269,7 @@ fn for_object_expr() {
     check_fmt(
         "x = {for k, v in map : k => upper(v)}\n",
         expect![[r#"
-            x = {for k, v in map : k => upper(v)}
+            x = { for k, v in map : k => upper(v) }
         "#]],
     );
 }
