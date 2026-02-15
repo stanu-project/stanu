@@ -498,14 +498,11 @@ impl<'a> Lexer<'a> {
         // Check if we're at the closing anchor (possibly indented)
         if self.is_at_heredoc_close() {
             let anchor_len = self.mode_stack.last().unwrap().heredoc_anchor.len();
-            let indent = self.mode_stack.last().unwrap().heredoc_indent;
-            // Consume optional leading whitespace for indented heredocs
-            if indent {
-                while self.pos < self.source.len() {
-                    match self.peek_char() {
-                        Some(' ' | '\t') => { self.advance(); }
-                        _ => break,
-                    }
+            // Always consume optional leading whitespace before the closing anchor
+            while self.pos < self.source.len() {
+                match self.peek_char() {
+                    Some(' ' | '\t') => { self.advance(); }
+                    _ => break,
                 }
             }
             self.advance_bytes(anchor_len);
@@ -547,12 +544,10 @@ impl<'a> Lexer<'a> {
         };
         let remaining = self.remaining();
 
-        // Determine the start of content (skip leading whitespace for indented heredocs)
-        let content = if entry.heredoc_indent {
-            remaining.trim_start_matches([' ', '\t'])
-        } else {
-            remaining
-        };
+        // Always skip leading whitespace when checking for the closing anchor.
+        // Both `<<` and `<<-` heredocs allow the closing marker to be indented;
+        // the `<<-` form additionally strips indentation from content lines.
+        let content = remaining.trim_start_matches([' ', '\t']);
 
         // Check if at start of line (pos == 0 or previous char is \n)
         let at_line_start = self.pos == 0 || self.source.as_bytes()[self.pos - 1] == b'\n';
