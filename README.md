@@ -2,6 +2,8 @@
 
 > **The Ruff of Terraform.**
 
+> This is pre-alpha software. Don't use it just yet.
+
 [![Crates.io](https://img.shields.io/crates/v/stanu.svg)](https://crates.io/crates/stanu)
 [![License](https://img.shields.io/crates/l/stanu.svg)](https://github.com/yourusername/stanu/blob/main/LICENSE)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/yourusername/stanu/ci.yml?branch=main)](https://github.com/yourusername/stanu/actions)
